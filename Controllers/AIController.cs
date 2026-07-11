@@ -1,5 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using OpenAI.Chat;
+﻿using Backend.Services;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Backend.Controllers;
 
@@ -7,11 +7,11 @@ namespace Backend.Controllers;
 [Route("api/[controller]")]
 public class AIController : ControllerBase
 {
-    private readonly IConfiguration _configuration;
+    private readonly IAIService _aiService;
 
-    public AIController(IConfiguration configuration)
+    public AIController(IAIService aiService)
     {
-        _configuration = configuration;
+        _aiService = aiService;
     }
 
     [HttpGet("hello")]
@@ -23,23 +23,11 @@ public class AIController : ControllerBase
     [HttpPost("chat")]
     public async Task<IActionResult> Chat([FromBody] ChatRequest request)
     {
-        var apiKey = _configuration["OpenAI:ApiKey"];
-
-        if (string.IsNullOrWhiteSpace(apiKey))
-        {
-            return BadRequest("OpenAI API key is missing.");
-        }
-
-        var client = new ChatClient(
-            model: "gpt-5.5",
-            apiKey: apiKey
-        );
-
-        var response = await client.CompleteChatAsync(request.Prompt);
+        var result = await _aiService.GetResponseAsync(request.Prompt);
 
         return Ok(new
         {
-            message = response.Value.Content[0].Text
+            message = result
         });
     }
 }

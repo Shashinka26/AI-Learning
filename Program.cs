@@ -1,4 +1,6 @@
+using Backend.Services;
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddScoped<IAIService, AIService>();
 
 // Add services to the container.
 
