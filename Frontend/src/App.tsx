@@ -1,5 +1,9 @@
-import { useState } from 'react'
+import { useState } from "react";
+import type { Message } from './types/Message'
 import './App.css'
+import ChatWindow from "./components/ChatWindow";
+import ChatInput from './components/ChatInput'
+
 
 type ChatResponse = {
   message: string
@@ -7,19 +11,32 @@ type ChatResponse = {
 
 function App() {
   const [prompt, setPrompt] = useState('')
-  const [response, setResponse] = useState('')
+  const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   const sendPrompt = async () => {
-    if (!prompt.trim()) {
+   
+    const trimmedPrompt = prompt.trim()
+
+    if (!trimmedPrompt) {
       setError('Please enter a question.')
       return
     }
 
+    const userMessage: Message = {
+      sender: 'user',
+      text: trimmedPrompt,
+    }
+
+    setMessages((currentMessages) => [
+      ...currentMessages,
+      userMessage,
+    ])
+
+    setPrompt('')
     setLoading(true)
     setError('')
-    setResponse('')
 
     try {
       const apiResponse = await fetch(
@@ -30,7 +47,7 @@ function App() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            prompt: prompt,
+            prompt: trimmedPrompt,
           }),
         },
       )
@@ -40,8 +57,18 @@ function App() {
       }
 
       const data: ChatResponse = await apiResponse.json()
-      setResponse(data.message)
-    } catch {
+
+      const aiMessage: Message = {
+        sender: 'ai',
+        text: data.message,
+      }
+
+      setMessages((currentMessages) => [
+        ...currentMessages,
+        aiMessage,
+      ])
+    } catch (error) {
+      console.error(error)
       setError('Could not connect to the backend.')
     } finally {
       setLoading(false)
@@ -54,25 +81,17 @@ function App() {
         <h1>AI Assistant</h1>
         <p>Ask a question and receive an AI-generated response.</p>
 
-        <textarea
-          value={prompt}
-          onChange={(event) => setPrompt(event.target.value)}
-          placeholder="Type your question..."
-          rows={6}
-        />
+        <ChatWindow
+  messages={messages}
+  loading={loading}
+/>
 
-        <button type="button" onClick={sendPrompt} disabled={loading}>
-          {loading ? 'Thinking...' : 'Send'}
-        </button>
-
-        {error && <div className="error">{error}</div>}
-
-        {response && (
-          <div className="response">
-            <h2>AI Response</h2>
-            <p>{response}</p>
-          </div>
-        )}
+        <ChatInput
+  prompt={prompt}
+  loading={loading}
+  setPrompt={setPrompt}
+  sendPrompt={sendPrompt}
+/>
       </section>
     </main>
   )
