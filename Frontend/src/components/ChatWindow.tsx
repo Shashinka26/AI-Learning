@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { Message } from '../types/Message'
 import ChatMessage from './ChatMessage'
+import TypingIndicator from "./TypingIndicator";
 
 type ChatWindowProps = {
   messages: Message[]
@@ -28,12 +29,7 @@ function ChatWindow({
         />
       ))}
 
-      {loading && (
-        <div className="message ai">
-          <strong>AI</strong>
-          <p>Thinking...</p>
-        </div>
-      )}
+      {loading && <TypingIndicator />}
 
       <div ref={messagesEndRef} />
     </div>
