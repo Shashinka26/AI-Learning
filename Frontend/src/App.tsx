@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Message } from "./types/Message";
 import type { Conversation } from "./types/Conversation";
 import "./App.css";
@@ -26,12 +26,60 @@ const createNewConversation = (): Conversation => {
 function App() {
   const [prompt, setPrompt] = useState("");
 
-  const [conversations, setConversations] = useState<Conversation[]>(() => [
-    createNewConversation(),
-  ]);
+  const [conversations, setConversations] =
+  useState<Conversation[]>(() => {
+    const savedConversations =
+      localStorage.getItem("conversations");
+
+    if (savedConversations) {
+      return JSON.parse(savedConversations);
+    }
+
+    return [createNewConversation()];
+  });
+  const handleSelectConversation = (conversationId: string) => {
+  setCurrentConversationId(conversationId);
+  setPrompt("");
+  setError("");
+};
+
+  const handleRenameConversation = (
+  conversationId: string,
+  newTitle: string,
+) => {
+  const trimmedTitle = newTitle.trim();
+
+  if (!trimmedTitle) {
+    return;
+  }
+
+  setConversations((currentConversations) =>
+    currentConversations.map((conversation) =>
+      conversation.id === conversationId
+        ? {
+            ...conversation,
+            title: trimmedTitle,
+            updatedAt: new Date(),
+          }
+        : conversation,
+    ),
+  );
+};
 
   const [currentConversationId, setCurrentConversationId] =
-    useState<string>(() => conversations[0].id);
+  useState<string>(() => {
+    const savedConversations =
+      localStorage.getItem("conversations");
+
+    if (savedConversations) {
+      const conversations: Conversation[] =
+        JSON.parse(savedConversations);
+
+      return conversations[0].id;
+    }
+
+    return createNewConversation().id;
+  });
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -39,12 +87,35 @@ function App() {
   const currentConversation = conversations.find(
     (conversation) => conversation.id === currentConversationId,
   );
+  useEffect(() => {
+  localStorage.setItem(
+    "conversations",
+    JSON.stringify(conversations)
+  );
+}, [conversations]);  
+ const handleDeleteConversation = (conversationId: string) => {
+  setConversations((currentConversations) => {
+    const remainingConversations = currentConversations.filter(
+      (conversation) => conversation.id !== conversationId,
+    );
 
-  const handleSelectConversation = (conversationId: string) => {
-    setCurrentConversationId(conversationId);
-    setPrompt("");
-    setError("");
-  };
+    if (remainingConversations.length === 0) {
+      const newConversation = createNewConversation();
+      setCurrentConversationId(newConversation.id);
+
+      return [newConversation];
+    }
+
+    if (conversationId === currentConversationId) {
+      setCurrentConversationId(remainingConversations[0].id);
+    }
+
+    return remainingConversations;
+  });
+
+  setPrompt("");
+  setError("");
+};
 
   const addMessageToConversation = (
     conversationId: string,
@@ -57,10 +128,17 @@ function App() {
         }
 
         return {
-          ...conversation,
-          messages: [...conversation.messages, message],
-          updatedAt: new Date(),
-        };
+  ...conversation,
+
+  title:
+    conversation.title === "New Chat" && message.sender === "user"
+      ? message.text.slice(0, 35)
+      : conversation.title,
+
+  messages: [...conversation.messages, message],
+
+  updatedAt: new Date(),
+};
       }),
     );
   };
@@ -140,11 +218,12 @@ function App() {
   return (
     <main className="app">
       <Sidebar
-        conversations={conversations}
-        currentConversationId={currentConversationId}
-        onNewChat={handleNewChat}
-        onSelectConversation={handleSelectConversation}
-      />
+  conversations={conversations}
+  currentConversationId={currentConversationId}
+  onNewChat={handleNewChat}
+  onSelectConversation={handleSelectConversation}
+  onDeleteConversation={handleDeleteConversation}
+/>
 
       <section className="chat-card">
         <h1>AI Assistant</h1>
