@@ -30,6 +30,26 @@ public class AIController : ControllerBase
             message = result
         });
     }
+
+    [HttpPost("chat/stream")]
+    public async Task StreamChat(
+        [FromBody] ChatRequest request,
+        CancellationToken cancellationToken)
+    {
+        Response.ContentType = "text/plain; charset=utf-8";
+        Response.Headers.Append("Cache-Control", "no-cache");
+
+        await foreach (
+            var chunk in _aiService.GetStreamingResponseAsync(
+                request.Prompt,
+                cancellationToken
+            )
+        )
+        {
+            await Response.WriteAsync(chunk, cancellationToken);
+            await Response.Body.FlushAsync(cancellationToken);
+        }
+    }
 }
 
 public class ChatRequest
