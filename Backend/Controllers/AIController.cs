@@ -1,10 +1,12 @@
 ﻿using Backend.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Backend.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class AIController : ControllerBase
 {
     private readonly IAIService _aiService;
@@ -21,7 +23,8 @@ public class AIController : ControllerBase
     }
 
     [HttpPost("chat")]
-    public async Task<IActionResult> Chat([FromBody] ChatRequest request)
+    public async Task<IActionResult> Chat(
+        [FromBody] ChatRequest request)
     {
         var result = await _aiService.GetResponseAsync(request.Prompt);
 
@@ -42,9 +45,7 @@ public class AIController : ControllerBase
         await foreach (
             var chunk in _aiService.GetStreamingResponseAsync(
                 request.Prompt,
-                cancellationToken
-            )
-        )
+                cancellationToken))
         {
             await Response.WriteAsync(chunk, cancellationToken);
             await Response.Body.FlushAsync(cancellationToken);

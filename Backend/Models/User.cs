@@ -1,4 +1,7 @@
-﻿namespace Backend.Models;
+﻿
+
+
+namespace Backend.Models;
 
 public class User
 {
@@ -11,4 +14,6 @@ public class User
     public string PasswordHash { get; set; } = string.Empty;
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public List<Conversation> Conversations { get; set; } = new();
 }
