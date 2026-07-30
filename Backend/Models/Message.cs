@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace Backend.Models;
 
@@ -10,6 +11,7 @@ public class Message
     [Required]
     public Guid ConversationId { get; set; }
 
+    [JsonIgnore]
     public Conversation Conversation { get; set; } = null!;
 
     [Required]

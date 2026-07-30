@@ -1,6 +1,8 @@
 ﻿using Backend.Data;
 using Backend.Models;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace Backend.Services;
 
@@ -58,4 +60,5 @@ public class ConversationService : IConversationService
     {
         throw new NotImplementedException();
     }
+    
 }
