@@ -3,44 +3,17 @@ import type { Message } from "./types/Message";
 import type { Conversation } from "./types/Conversation";
 import "./App.css";
 
+import {
+  createConversation,
+  getConversations,
+} from "./services/conversationService";
+
+import { getMessages } from "./services/messageService";
+
 import Login from "./pages/Login";
 import Sidebar from "./components/Sidebar";
 import ChatWindow from "./components/ChatWindow";
 import ChatInput from "./components/ChatInput";
-
-const createNewConversation = (): Conversation => {
-  const now = new Date();
-
-  return {
-    id: crypto.randomUUID(),
-    title: "New Chat",
-    messages: [],
-    createdAt: now,
-    updatedAt: now,
-  };
-};
-
-const loadConversations = (): Conversation[] => {
-  const savedConversations =
-    localStorage.getItem("conversations");
-
-  if (!savedConversations) {
-    return [createNewConversation()];
-  }
-
-  try {
-    const parsedConversations: Conversation[] =
-      JSON.parse(savedConversations);
-
-    if (parsedConversations.length === 0) {
-      return [createNewConversation()];
-    }
-
-    return parsedConversations;
-  } catch {
-    return [createNewConversation()];
-  }
-};
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] =
@@ -51,12 +24,12 @@ function App() {
   const [prompt, setPrompt] = useState("");
 
   const [conversations, setConversations] =
-    useState<Conversation[]>(loadConversations);
+    useState<Conversation[]>([]);
 
   const [
     currentConversationId,
     setCurrentConversationId,
-  ] = useState<string>(() => conversations[0].id);
+  ] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -66,19 +39,170 @@ function App() {
       conversation.id === currentConversationId,
   );
 
+  /*
+   * Load the logged-in user's conversations
+   * from PostgreSQL through the backend API.
+   */
   useEffect(() => {
-    localStorage.setItem(
-      "conversations",
-      JSON.stringify(conversations),
-    );
-  }, [conversations]);
+    if (!isAuthenticated) {
+      return;
+    }
 
-  const handleSelectConversation = (
+    const loadUserConversations = async () => {
+      setLoading(true);
+      setError("");
+
+      try {
+        const loadedConversations =
+          await getConversations();
+
+        const normalizedConversations: Conversation[] =
+          loadedConversations.map((conversation) => ({
+            ...conversation,
+            messages: conversation.messages ?? [],
+            createdAt: new Date(
+              conversation.createdAt,
+            ),
+            updatedAt: new Date(
+              conversation.updatedAt,
+            ),
+          }));
+
+        setConversations(normalizedConversations);
+
+        if (normalizedConversations.length === 0) {
+          setCurrentConversationId("");
+          return;
+        }
+
+        const firstConversation =
+          normalizedConversations[0];
+
+        setCurrentConversationId(
+          firstConversation.id,
+        );
+
+        const loadedMessages = await getMessages(
+          firstConversation.id,
+        );
+
+        setConversations((currentConversations) =>
+          currentConversations.map((conversation) =>
+            conversation.id === firstConversation.id
+              ? {
+                  ...conversation,
+                  messages: loadedMessages.map(
+                    (message) => ({
+                      ...message,
+                      createdAt: new Date(
+                        message.createdAt,
+                      ),
+                    }),
+                  ),
+                }
+              : conversation,
+          ),
+        );
+      } catch (loadError) {
+        console.error(loadError);
+
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Could not load conversations.",
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void loadUserConversations();
+  }, [isAuthenticated]);
+
+  const handleSelectConversation = async (
     conversationId: string,
   ) => {
     setCurrentConversationId(conversationId);
     setPrompt("");
     setError("");
+    setLoading(true);
+
+    try {
+      const loadedMessages =
+        await getMessages(conversationId);
+
+      setConversations((currentConversations) =>
+        currentConversations.map((conversation) =>
+          conversation.id === conversationId
+            ? {
+                ...conversation,
+                messages: loadedMessages.map(
+                  (message) => ({
+                    ...message,
+                    createdAt: new Date(
+                      message.createdAt,
+                    ),
+                  }),
+                ),
+              }
+            : conversation,
+        ),
+      );
+    } catch (loadError) {
+      console.error(loadError);
+
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Could not load messages.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleNewChat = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const createdConversation =
+        await createConversation("New Chat");
+
+      const normalizedConversation: Conversation = {
+        ...createdConversation,
+        messages: [],
+        createdAt: new Date(
+          createdConversation.createdAt,
+        ),
+        updatedAt: new Date(
+          createdConversation.updatedAt,
+        ),
+      };
+
+      setConversations(
+        (currentConversations) => [
+          normalizedConversation,
+          ...currentConversations,
+        ],
+      );
+
+      setCurrentConversationId(
+        normalizedConversation.id,
+      );
+
+      setPrompt("");
+    } catch (createError) {
+      console.error(createError);
+
+      setError(
+        createError instanceof Error
+          ? createError.message
+          : "Could not create conversation.",
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleRenameConversation = (
@@ -114,22 +238,11 @@ function App() {
             conversation.id !== conversationId,
         );
 
-      if (remainingConversations.length === 0) {
-        const newConversation =
-          createNewConversation();
-
-        setCurrentConversationId(
-          newConversation.id,
-        );
-
-        return [newConversation];
-      }
-
       if (
         conversationId === currentConversationId
       ) {
         setCurrentConversationId(
-          remainingConversations[0].id,
+          remainingConversations[0]?.id ?? "",
         );
       }
 
@@ -146,9 +259,7 @@ function App() {
   ) => {
     setConversations((currentConversations) =>
       currentConversations.map((conversation) => {
-        if (
-          conversation.id !== conversationId
-        ) {
+        if (conversation.id !== conversationId) {
           return conversation;
         }
 
@@ -179,9 +290,7 @@ function App() {
   ) => {
     setConversations((currentConversations) =>
       currentConversations.map((conversation) => {
-        if (
-          conversation.id !== conversationId
-        ) {
+        if (conversation.id !== conversationId) {
           return conversation;
         }
 
@@ -204,29 +313,14 @@ function App() {
     );
   };
 
-  const handleNewChat = () => {
-    const newConversation =
-      createNewConversation();
-
-    setConversations(
-      (currentConversations) => [
-        newConversation,
-        ...currentConversations,
-      ],
-    );
-
-    setCurrentConversationId(
-      newConversation.id,
-    );
-
-    setPrompt("");
-    setError("");
-  };
-
   const handleLogout = () => {
     localStorage.removeItem("authToken");
     localStorage.removeItem("authUser");
 
+    setConversations([]);
+    setCurrentConversationId("");
+    setPrompt("");
+    setError("");
     setIsAuthenticated(false);
   };
 
@@ -247,37 +341,69 @@ function App() {
       return;
     }
 
-    const activeConversationId =
-      currentConversationId;
-
-    const userMessage: Message = {
-      id: crypto.randomUUID(),
-      sender: "user",
-      text: trimmedPrompt,
-      createdAt: new Date(),
-    };
-
-    addMessageToConversation(
-      activeConversationId,
-      userMessage,
-    );
-
-    setPrompt("");
     setLoading(true);
     setError("");
 
     try {
+      /*
+       * Create a conversation automatically when
+       * the user has no selected conversation.
+       */
+      let activeConversationId =
+        currentConversationId;
+
+      if (!activeConversationId) {
+        const createdConversation =
+          await createConversation("New Chat");
+
+        const normalizedConversation: Conversation = {
+          ...createdConversation,
+          messages: [],
+          createdAt: new Date(
+            createdConversation.createdAt,
+          ),
+          updatedAt: new Date(
+            createdConversation.updatedAt,
+          ),
+        };
+
+        setConversations(
+          (currentConversations) => [
+            normalizedConversation,
+            ...currentConversations,
+          ],
+        );
+
+        activeConversationId =
+          normalizedConversation.id;
+
+        setCurrentConversationId(
+          activeConversationId,
+        );
+      }
+
+      const userMessage: Message = {
+        id: crypto.randomUUID(),
+        sender: "user",
+        text: trimmedPrompt,
+        createdAt: new Date(),
+      };
+
+      addMessageToConversation(
+        activeConversationId,
+        userMessage,
+      );
+
+      setPrompt("");
+
       const apiResponse = await fetch(
         "http://localhost:5136/api/AI/chat/stream",
         {
           method: "POST",
-
           headers: {
             "Content-Type": "application/json",
-
             Authorization: `Bearer ${token}`,
           },
-
           body: JSON.stringify({
             prompt: trimmedPrompt,
           }),
