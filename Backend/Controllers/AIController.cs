@@ -7,6 +7,9 @@ namespace Backend.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
+
+
+
 public class AIController : ControllerBase
 {
     private readonly IAIService _aiService;
@@ -34,6 +37,7 @@ public class AIController : ControllerBase
         });
     }
 
+
     [HttpPost("chat/stream")]
     public async Task StreamChat(
         [FromBody] ChatRequest request,
@@ -42,11 +46,12 @@ public class AIController : ControllerBase
         Response.ContentType = "text/plain; charset=utf-8";
         Response.Headers.Append("Cache-Control", "no-cache");
 
-        await foreach (
-            var chunk in _aiService.GetStreamingResponseAsync(
-                request.Prompt,
-                cancellationToken))
+        await foreach (var chunk in _aiService.GetStreamingResponseAsync(
+    request.Prompt,
+    cancellationToken))
         {
+            Console.Write(chunk);
+
             await Response.WriteAsync(chunk, cancellationToken);
             await Response.Body.FlushAsync(cancellationToken);
         }
